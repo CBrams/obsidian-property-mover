@@ -16,6 +16,8 @@ export class PropertyMoverSettingsTab extends PluginSettingTab {
         }
         this.add_button_to_update_set_of_properties();
         this.add_list_of_properties_to_track();
+        this.add_to_list_of_ignored_directories();
+        this.show_list_of_ignored_directories();
     }
 
     add_ignore_empty_properties_toggle(): void {
@@ -50,11 +52,13 @@ export class PropertyMoverSettingsTab extends PluginSettingTab {
             })
     }
 
+
     add_button_to_update_set_of_properties(): void {
         const description = document.createDocumentFragment();
-        description.append("Click here to update the tags open for suggestion")
+        description.append("Click here to update the tags open for suggestion, as well as the directories for exclusion")
         description.append(description.createEl('br'));
-        description.append(description.createEl('strong', {text: 'Current count: '+this.plugin.settings.property_cache.loaded_properties_for_suggestions.length}))
+        description.append(description.createEl('strong', {text: 'Current count (properties): '+this.plugin.settings.cache.loaded_properties_for_suggestions.length}))
+        description.append(description.createEl('strong', {text: 'Current count (directories): '+this.plugin.settings.cache.loaded_directories_for_suggestions.length}))
 
         new Setting(this.containerEl)
         .setName("Update properties for suggestions")
@@ -67,26 +71,62 @@ export class PropertyMoverSettingsTab extends PluginSettingTab {
                 let setOfProperties = new Set<string>();
                 files.forEach(file => {
                     const propertyMap = getFileProperties(this.app, file);
-                    propertyMap.forEach((k,v) => setOfProperties.add(k));
+                    console.log(propertyMap)
+                    propertyMap.forEach((value,key) => {
+                        setOfProperties.add(key)}
+                    );
                 });
-                console.log(this.plugin.settings.property_cache);
-                this.plugin.settings.property_cache = {
-                    loaded_properties_for_suggestions: Array.from(setOfProperties)
+                const directories = this.app.vault.getAllFolders(false).map(dir => dir.path);
+                this.plugin.settings.cache = {
+                    loaded_properties_for_suggestions: Array.from(setOfProperties),
+                    loaded_directories_for_suggestions: directories
                 };
                 await this.plugin.saveSettings();
                 this.display();
             });
         })
-
     }
 
-    add_list_of_properties_to_track(): void {
+    add_to_list_of_ignored_directories(): void {
+        const suggestions = new Set(this.plugin.settings.cache.loaded_directories_for_suggestions);
+
         const description = document.createDocumentFragment();
-        description.append("List of properties to track");
+        description.append("Add directories to exclude from moving")
+        description.append(description.createEl('br'));
+        description.append("Remove directories by pressing x")
+
+
+        new Setting(this.containerEl)
+        .setName("New directory to ignore")
+        .setDesc(description)
+        .addSearch(textComponent => {
+            new MultiSuggest(textComponent.inputEl,suggestions,async (v) => this.update_directory_to_be_excluded(v),this.app);
+            
+        })
+    }
+
+    show_list_of_ignored_directories(): void {
+        this.plugin.settings.ignored_directories.forEach((property, index) => {
+            const settingElement = new Setting(this.containerEl)
+            .setName(property)
+            .addExtraButton((cb) => {
+                cb.setIcon('cross')
+                    .setTooltip('Delete')
+                    .onClick(async () => {
+                        this.plugin.settings.ignored_directories.splice(index, 1);
+                        await this.plugin.saveSettings();
+                        this.display();
+                    });
+            });
+        })
+    }
+
+
+    add_list_of_properties_to_track(): void {
         //TODO Consider just doing the ignore if missing here...
         this.add_button_to_add_more_properties_to_track();
 
-        const suggestions = new Set(this.plugin.settings.property_cache.loaded_properties_for_suggestions);
+        const suggestions = new Set(this.plugin.settings.cache.loaded_properties_for_suggestions);
 
         this.plugin.settings.property_trackers.forEach((property, index) => {
             const settingElement = new Setting(this.containerEl)
@@ -139,6 +179,15 @@ export class PropertyMoverSettingsTab extends PluginSettingTab {
         this.plugin.settings.property_trackers[index] = {
             propertyName: newValue
         }
+        await this.plugin.saveSettings();
+        this.display();
+    }
+
+    private async update_directory_to_be_excluded(newValue: string){
+        if(this.plugin.settings.ignored_directories.contains(newValue)){
+            return;
+        }
+        this.plugin.settings.ignored_directories = [...this.plugin.settings.ignored_directories, newValue]
         await this.plugin.saveSettings();
         this.display();
     }

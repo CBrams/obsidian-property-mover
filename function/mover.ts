@@ -23,6 +23,10 @@ export const moveFile = async (app: App, file: TFile, targetPath: string) => {
 export const handleFile = async (app: App, file: TFile | null | undefined, settings: PropertyMoverSettings) => {
     if (file != null && file != undefined) {
         const properties = getFileProperties(app, file);
+        const ignore = settings.ignored_directories.find(dir => file.path.startsWith(dir)) != undefined;
+        if(ignore){
+            return; //Don't move any files listed in the ignore directories
+        }
         const newPath = constructNewPath(properties,settings);
         moveFile(app, file,newPath);
     }
