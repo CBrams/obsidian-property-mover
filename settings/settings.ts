@@ -3,6 +3,7 @@ import { PropertyMoverSettings } from "./interfaces";
 import PropertyMover from "main";
 import { DEFAULT_PROPERTY } from "./defaults";
 import { MultiSuggest } from "./suggest";
+import { getFileProperties } from "function/propertyParser";
 
 export class PropertyMoverSettingsTab extends PluginSettingTab {
     plugin: PropertyMover
@@ -65,14 +66,8 @@ export class PropertyMoverSettingsTab extends PluginSettingTab {
                 const files = this.app.vault.getMarkdownFiles();
                 let setOfProperties = new Set<string>();
                 files.forEach(file => {
-                    const metadata = this.app.metadataCache.getFileCache(file);
-                    if(metadata?.frontmatter != null){
-                        for (const [key,value] of Object.entries(metadata!.frontmatter!)){
-                            if(!setOfProperties.has(key)){
-                                setOfProperties.add(key);
-                            }
-                        }
-                    }
+                    const propertyMap = getFileProperties(this.app, file);
+                    propertyMap.forEach((k,v) => setOfProperties.add(k));
                 });
                 console.log(this.plugin.settings.property_cache);
                 this.plugin.settings.property_cache = {
